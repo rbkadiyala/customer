@@ -22,12 +22,18 @@ jobs:
 
       - name: Install and configure AWS CLI
         run: |
+          # Install AWS CLI
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip -q awscliv2.zip
           sudo ./aws/install --update
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set default.region ${{ secrets.AWS_REGION }}
+
+          # Configure AWS CLI with secrets stored in GitHub Actions
+          aws configure set aws_access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws configure set default.region "${{ secrets.AWS_REGION }}"
+
+          # Clean up the AWS CLI installer files
+          rm -rf awscliv2.zip aws/
 
       - name: Log in to ECR
         run: |
