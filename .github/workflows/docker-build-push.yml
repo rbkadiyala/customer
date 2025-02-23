@@ -1,0 +1,39 @@
+name: Dockerize and Push Spring Boot Application
+
+on:
+  workflow_call:  # Allows other workflows to trigger this one
+
+jobs:
+  dockerize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download JAR file
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: target
+
+      - name: Build Docker image
+        run: docker build -t 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app .
+
+      - name: Install and configure AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install --update
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ secrets.AWS_REGION }}
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 761018885188.dkr.ecr.us-east-1.amazonaws.com
+
+      - name: Tag and push Docker image
+        run: |
+          docker tag 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app:latest 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app:${GITHUB_SHA}
+          docker push 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app:${GITHUB_SHA}
