@@ -10,4 +10,4 @@ on:
 
 jobs:
   build:
-    uses: ./.github/actions/build.yml  # Reusable build action
+    uses: ./.github/actions/build.yml@main  # Reusable build action
