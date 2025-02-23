@@ -8,7 +8,7 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
       AWS_REGION:
-        required: true  # Reusable workflow that can be called from other workflows
+        required: true
 
 jobs:
   dockerize:
@@ -24,9 +24,6 @@ jobs:
           name: app-jar
           path: target
 
-      - name: Build Docker image
-        run: docker build -t 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app .
-
       - name: Install AWS CLI
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -34,10 +31,11 @@ jobs:
           sudo ./aws/install --update
 
       - name: Configure AWS CLI with GitHub Secrets
-        run: |
-          aws configure set aws_access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws configure set aws_secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-          aws configure set default.region "${{ secrets.AWS_REGION }}"
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Clean up AWS CLI Installer Files
         run: |
@@ -46,6 +44,14 @@ jobs:
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" | docker login --username AWS --password-stdin 761018885188.dkr.ecr.us-east-1.amazonaws.com
+
+      - name: Create repo in ECR (If it doesn't exist)
+        run: |
+          aws ecr describe-repositories --repository-names my-spring-boot-app --region "${{ secrets.AWS_REGION }}" || aws ecr create-repository --repository-name my-spring-boot-app --region "${{ secrets.AWS_REGION }}"
+
+      - name: Build Docker image
+        run: |
+          docker build -t 761018885188.dkr.ecr.us-east-1.amazonaws.com/my-spring-boot-app .
 
       - name: Tag and push Docker image
         run: |
