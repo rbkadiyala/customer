@@ -1,7 +1,14 @@
 name: Dockerize and Push Spring Boot Application
 
 on:
-  workflow_call:  # Reusable workflow that can be called from other workflows
+  workflow_call:
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true  # Reusable workflow that can be called from other workflows
 
 jobs:
   dockerize:
