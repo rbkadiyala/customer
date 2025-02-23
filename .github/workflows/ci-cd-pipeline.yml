@@ -1,0 +1,13 @@
+name: CI/CD Pipeline for Spring Boot with Terraform EKS Deployment
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
