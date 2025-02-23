@@ -10,4 +10,8 @@ on:
 
 jobs:
   build:
-    uses: ./.github/actions/build.yml@main  # Reusable build action
+    uses: ./.github/workflows/build.yml
+    
+  dockerize:
+    needs: build
+    uses: ./.github/workflows/docker-build-push.yml  # Call the Docker Build and Push workflow

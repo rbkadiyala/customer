@@ -1,7 +1,7 @@
-name: Build Spring Boot Application
+name: Build and Test Spring Boot Application
 
 on:
-  workflow_call:  # Allows this workflow to be called by other workflows
+  workflow_call:  # Allows other workflows to trigger this one
 
 jobs:
   build:
