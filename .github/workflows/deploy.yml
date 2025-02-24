@@ -41,19 +41,19 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Initialize Terraform
-        run: terraform -chdir=./terraform init # Assuming your Terraform configuration files are in 'terraform' folder
+        run: terraform -chdir=./terraform init # Assuming your Terraform configuration files are in the 'terraform' folder
 
       - name: Generate Terraform Plan
-        run: terraform -chdir=./terraform plan -out=tfplan # Generate a Terraform plan and save it as a .plan file
+        run: terraform -chdir=./terraform plan -out=./terraform/tfplan # Generate the plan and save it to the 'terraform' directory
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: ./terraform/tfplan # Upload the saved Terraform plan for later use
+          path: ./terraform/tfplan # Upload the Terraform plan from the 'terraform' directory
 
       - name: Apply Terraform for EKS Deployment
-        run: terraform -chdir=./terraform apply -auto-approve ./terraform/tfplan  # Apply the saved plan for the configuration
+        run: terraform -chdir=./terraform apply -auto-approve ./terraform/tfplan  # Use the plan stored in the 'terraform' directory
 
       - name: Deploy to EKS
         run: |
