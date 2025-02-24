@@ -47,7 +47,7 @@ jobs:
         run: terraform -chdir=./terraform init # Initialize Terraform configuration
 
       - name: Generate Terraform Plan
-        run: terraform -chdir=./terraform plan -out=./terraform/tfplan.out # Generate the plan and save it to the 'terraform' directory
+        run: terraform -chdir=./terraform plan -out=tfplan.out # Generate the plan and save it to the 'terraform' directory
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
