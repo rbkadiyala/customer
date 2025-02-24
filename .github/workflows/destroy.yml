@@ -22,7 +22,8 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Initialize Terraform
-        run: terraform init
+        run: terraform -chdir=./terraform init
+
 
       - name: Destroy Terraform Resources
-        run: terraform destroy -auto-approve
+        run: terraform -chdir=./terraform destroy -auto-approve 
