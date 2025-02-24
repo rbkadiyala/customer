@@ -40,10 +40,10 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Initialize Terraform
-        run: terraform init
+        run: terraform init ./terraform # Assuming your Terraform configuration files are in 'terraform' folder
 
       - name: Apply Terraform for EKS Deployment
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve ./terraform  # Apply the configuration in the 'terraform' folder
 
       - name: Deploy to EKS
         run: |
