@@ -24,6 +24,12 @@ jobs:
       - name: Initialize Terraform
         run: terraform -chdir=./terraform init
 
+      - name: Download Terraform Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan  # Name of the artifact that contains the saved plan
+          path: ./terraform  # Path to download the artifact to
 
-      - name: Destroy Terraform Resources
-        run: terraform -chdir=./terraform destroy -auto-approve 
+      - name: Destroy Terraform Resources Using Saved Plan
+        run: terraform -chdir=./terraform destroy -auto-approve ./terraform/tfplan  # Apply the destroy action using the saved plan
+
