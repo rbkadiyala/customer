@@ -40,8 +40,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Ensure Terraform Directory Exists
+        run: mkdir -p ./terraform  # Create the 'terraform' directory if it doesn't exist
+
       - name: Initialize Terraform
-        run: terraform -chdir=./terraform init # Assuming your Terraform configuration files are in the 'terraform' folder
+        run: terraform -chdir=./terraform init # Initialize Terraform configuration
 
       - name: Generate Terraform Plan
         run: terraform -chdir=./terraform plan -out=./terraform/tfplan.out # Generate the plan and save it to the 'terraform' directory
