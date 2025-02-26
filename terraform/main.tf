@@ -1,115 +1,124 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-provider "aws" {
-  region = var.region
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"  # Use the latest version for AWS provider
+    }
+  }
+  required_version = ">= 1.5.0"  # Use the latest stable Terraform version
 }
 
-# Filter out local zones, which are not currently supported 
-# with managed node groups
-data "aws_availability_zones" "available" {
-  filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
-  }
+provider "aws" {
+  region = local.aws_region
 }
 
 locals {
-  #cluster_name = "customer-eks-${random_string.suffix.result}"
-  cluster_name = "my-eks-cluster"
+  # Define all variables in the locals block
+  aws_region           = "us-east-1"
+  cluster_name         = "my-eks-cluster"
+  ecr_repository_name  = "my-spring-boot-app"
+  vpc_name             = "my-vpc"
+  cidr_block           = "10.0.0.0/16"
+  azs                  = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  private_subnets      = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets       = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  instance_type        = "t2.small"
+  node_desired_capacity = 1
+  node_max_capacity    = 2
+  node_min_capacity    = 1
+  environment          = "dev"
+  enable_nat_gateway   = false
+  enable_vpn_gateway   = false
+  encryption_type      = "AES256"
+  image_tag_mutability = "IMMUTABLE"
+  prevent_destroy      = true
+
+  # IAM Policies for the EKS Cluster
+  eks_iam_policies = [
+    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  ]
 }
 
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
+resource "aws_ecr_repository" "this" {
+  name                 = local.ecr_repository_name
+  image_tag_mutability = local.image_tag_mutability
+  encryption_configuration {
+    encryption_type = local.encryption_type
+  }
+
+  lifecycle {
+    prevent_destroy = local.prevent_destroy
+  }
+
+  tags = {
+    Environment = local.environment
+    Terraform   = "true"
+  }
 }
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "5.8.1"
+  version = "~> 3.0"  # Ensure to use a version that aligns with your Terraform version
 
-  name = "customer-vpc"
+  name          = local.vpc_name
+  cidr          = local.cidr_block
+  azs           = local.azs
+  private_subnets = local.private_subnets
+  public_subnets  = local.public_subnets
 
-  cidr = "10.0.0.0/16"
-  azs  = slice(data.aws_availability_zones.available.names, 0, 3)
+  enable_nat_gateway = local.enable_nat_gateway
+  enable_vpn_gateway = local.enable_vpn_gateway
 
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
-
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
-
-  public_subnet_tags = {
-    "kubernetes.io/role/elb" = 1
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = 1
+  tags = {
+    Terraform   = "true"
+    Environment = local.environment
   }
 }
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.8.5"
+  version = "~> 19.0"  # Use latest version of the EKS module
 
-  cluster_name    = local.cluster_name
-  cluster_version = "1.29"
+  cluster_name = local.cluster_name
+  subnets      = module.vpc.public_subnets
+  vpc_id       = module.vpc.vpc_id
 
-  cluster_endpoint_public_access           = true
-  enable_cluster_creator_admin_permissions = true
+  tags = {
+    Terraform   = "true"
+    Environment = local.environment
+  }
 
-  cluster_addons = {
-    aws-ebs-csi-driver = {
-      service_account_role_arn = module.irsa-ebs-csi.iam_role_arn
+  node_groups = {
+    default = {
+      instance_type    = local.instance_type
+      desired_capacity = local.node_desired_capacity
+      max_capacity     = local.node_max_capacity
+      min_capacity     = local.node_min_capacity
+
+      additional_tags = {
+        Terraform   = "true"
+        Environment = local.environment
+      }
     }
   }
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
-
-  eks_managed_node_group_defaults = {
-    ami_type = "AL2_x86_64"
-
-  }
-
-  eks_managed_node_groups = {
-	/*
-    one = {
-      name = "node-group-1"
-
-      instance_types = ["t3.small"]
-
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-    }*/
-	
-    two = {
-      name = "node-group-2"
-
-      instance_types = ["t3.small"]
-
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
-    }
-  }
+  # Configure IAM role for the EKS Cluster (optional best practice)
+  cluster_iam_role_additional_policies = local.eks_iam_policies
 }
 
-
-# https://aws.amazon.com/blogs/containers/amazon-ebs-csi-driver-is-now-generally-available-in-amazon-eks-add-ons/ 
-data "aws_iam_policy" "ebs_csi_policy" {
-  arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+output "ecr_repository_url" {
+  value = aws_ecr_repository.this.repository_url
 }
 
-module "irsa-ebs-csi" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role-with-oidc"
-  version = "5.39.0"
+output "eks_cluster_name" {
+  value = module.eks.cluster_name
+}
 
-  create_role                   = true
-  role_name                     = "AmazonEKSTFEBSCSIRole-${module.eks.cluster_name}"
-  provider_url                  = module.eks.oidc_provider
-  role_policy_arns              = [data.aws_iam_policy.ebs_csi_policy.arn]
-  oidc_fully_qualified_subjects = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+output "eks_cluster_endpoint" {
+  value = module.eks.cluster_endpoint
+}
+
+output "eks_cluster_arn" {
+  value = module.eks.cluster_arn
 }
