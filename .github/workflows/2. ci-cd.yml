@@ -172,6 +172,6 @@ jobs:
           echo "Testing the Kubernetes service at $K8S_URL"
           
           # Run the curl command to test the specific endpoint
-          curl --max-time 30 --silent --fail "$K8S_URL"
+          curl -v --max-time 30 --silent --fail "$K8S_URL"
           
           echo "Successfully tested the Kubernetes service"
