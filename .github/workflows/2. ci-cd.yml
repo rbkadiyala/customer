@@ -161,6 +161,19 @@ jobs:
           
           # Export the K8S_SERVICE_URL as environment variable for the next steps
           echo "K8S_SERVICE_URL=$K8S_SERVICE_URL" >> $GITHUB_ENV  # This ensures the next job has access to the URL
+
+      - name: Wait for LoadBalancer DNS to be resolvable (Retry logic)
+        run: |
+          echo "Waiting for LoadBalancer DNS to resolve..."
+          for i in {1..10}; do
+            if nslookup ${{ env.K8S_SERVICE_URL }}; then
+              echo "DNS resolved successfully!"
+              break
+            else
+              echo "Attempt $i: DNS not resolved, waiting..."
+              sleep 15  # Wait 15 seconds before retrying
+            fi
+          done
           
       - name: Test Kubernetes Service URL
         run: |
