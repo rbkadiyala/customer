@@ -1,0 +1,243 @@
+# CI/CD Workflow
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allows the workflow to be triggered manually from the GitHub UI
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}  # AWS region from secrets
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # AWS access key ID from secrets
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # AWS secret access key from secrets
+  PROJECT_NAME: ${{ secrets.PROJECT_NAME }}  # Project name as an environment variable
+  SPRING_BOOT_APP_NAME: ${{ secrets.SPRING_BOOT_APP_NAME }}  # Spring Boot app name as an environment variable
+  CONTAINER_PORT: ${{ secrets.CONTAINER_PORT }}  # Port from secrets
+  IMAGE_TAG: latest  # Use GitHub SHA as the tag for the image (e.g., ${{ github.sha }})
+  EKS_CLUSTER_NAME: ${{ secrets.PROJECT_NAME }}-eks-cluster
+  ECR_REPOSITORY_URL: "761018885188.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.SPRING_BOOT_APP_NAME }}"  # ECR repository URL
+
+jobs:
+  app-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 18
+        uses: actions/setup-java@v3
+        with:
+          java-version: 18
+          distribution: 'adopt'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build and test with Maven
+        run: mvn --batch-mode --update-snapshots --no-transfer-progress clean package
+
+      - name: Upload JAR file
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/*.jar
+
+  image-build:
+    needs: app-build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: 'adopt'
+
+      - name: Download JAR file
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: target
+
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install --update
+          aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ env.AWS_REGION }}
+
+      - name: Create repo in ECR (If it doesn't exist)
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.SPRING_BOOT_APP_NAME }} --region "${{ env.AWS_REGION }}" || aws ecr create-repository --repository-name ${{ env.SPRING_BOOT_APP_NAME }} --region "${{ env.AWS_REGION }}"
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.ECR_REPOSITORY_URL }}:${{ env.IMAGE_TAG }} .
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REPOSITORY_URL }}
+
+      - name: Tag Docker image
+        run: |
+          docker tag ${{ env.ECR_REPOSITORY_URL }}:${{ env.IMAGE_TAG }} 761018885188.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.SPRING_BOOT_APP_NAME }}:latest
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.ECR_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+  infra-build:
+    needs: image-build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials for Terraform
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure Terraform Directory Exists
+        run: mkdir -p ./terraform  # Create the 'terraform' directory if it doesn't exist
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"  # Specify Terraform version to use
+
+      - name: Initialize Terraform
+        run: terraform -chdir=./terraform init  # Initialize Terraform working directory and install plugins
+
+      - name: Set PLAN_FILE as Environment Variable
+        run: echo "PLAN_FILE=./terraform/${{ env.EKS_CLUSTER_NAME }}plan.out"
+
+      - name: Generate Terraform Plan
+        run: |
+          echo "Generating Terraform Plan..."
+          terraform -chdir=./terraform plan -out="$PLAN_FILE"  # Generate the plan and save it
+
+      - name: Apply Terraform Plan
+        run: |
+          echo "Applying existing Terraform plan: $PLAN_FILE"
+          terraform -chdir=./terraform apply -auto-approve "$PLAN_FILE"  # Apply the existing plan
+
+  app-deploy:
+    needs: infra-build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials for kubectl
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig to access EKS cluster
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Prepare Kubernetes manifests
+        run: |
+          mkdir -p k8s  # Create k8s directory if it doesn't exist
+
+          # Export the environment variables explicitly to ensure they are available
+          export SPRING_BOOT_APP_NAME="${{ env.SPRING_BOOT_APP_NAME }}"
+          export ECR_REPOSITORY_URL="${{ env.ECR_REPOSITORY_URL }}"
+          export CONTAINER_PORT="${{ env.CONTAINER_PORT }}"
+          export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+
+          # Substitute the environment variables into the k8s deployment YAML
+          envsubst < k8s-deployment.yaml > k8s/k8s-deployment.yaml  # Perform variable substitution
+
+      - name: Print the Kubernetes Deployment Manifest
+        run: |
+          echo "Printing the Kubernetes manifest after substitution:"
+          cat k8s/k8s-deployment.yaml  # Print the manifest file to the console
+
+      - name: Generate Kustomization file
+        run: |
+          echo "resources:" > k8s/kustomization.yaml  # Create kustomization file
+          echo "- k8s-deployment.yaml" >> k8s/kustomization.yaml  # Add deployment file reference
+ 
+      - name: Apply Kubernetes deployment using kubectl
+        run: |
+          kubectl kustomize k8s | kubectl apply -f - --force  # Apply the k8s configuration with force to ensure it's up-to-date
+
+      - name: Get External Service URL
+        id: get_url
+        run: |
+          export K8S_SERVICE_URL=$(kubectl get svc ${{ env.SPRING_BOOT_APP_NAME }}-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "K8S_SERVICE_URL=$K8S_SERVICE_URL" >> $GITHUB_ENV
+
+  app-testing:
+    needs: app-deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Test Kubernetes Service URL
+        run: |
+          # Create the full URL by concatenating environment variables
+          K8S_URL="${{ env.K8S_SERVICE_URL }}/${{ env.SPRING_BOOT_APP_NAME }}s"
+          
+          # Print the full URL to the console
+          echo "Testing the Kubernetes service at $K8S_URL"
+          
+          # Run the curl command to test the URL
+          curl --max-time 30 --silent --fail "$K8S_URL"  # Testing the specific endpoint
+          
+          # Print a success message after the test
+          echo "Successfully tested the Kubernetes service"       
+
+  infra-destroy:
+    needs: app-testing
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials for Terraform
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"  # Specify Terraform version to use
+
+      - name: Initialize Terraform
+        run: terraform -chdir=./terraform init  # Initialize Terraform working directory and install plugins
+
+      - name: Destroy Terraform Infrastructure
+        run: |
+          echo "Destroying Terraform infrastructure..."
+          terraform -chdir=./terraform destroy -auto-approve  # Destroy the AWS infrastructure

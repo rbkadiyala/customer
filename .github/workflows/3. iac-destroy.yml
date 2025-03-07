@@ -1,0 +1,54 @@
+name: Infra-Destroy Workflow
+
+on:
+  workflow_dispatch:  # Triggered manually from GitHub UI
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}  # AWS region from secrets
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # AWS access key ID from secrets
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # AWS secret access key from secrets
+  PROJECT_NAME: ${{ secrets.PROJECT_NAME }}  # Project name as an environment variable
+  EKS_CLUSTER_NAME: ${{ secrets.PROJECT_NAME }}-eks-cluster
+
+jobs:
+  infra-destroy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials for Terraform
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure Terraform Directory Exists
+        run: mkdir -p ./terraform  # Ensure the 'terraform' directory exists
+
+      - name: Download Terraform State from Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-state  # Download the artifact containing the Terraform state
+          path: ./terraform      # Specify the path where the artifact will be downloaded
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"  # Specify Terraform version to use
+
+      - name: Initialize Terraform (with existing state)
+        run: terraform -chdir=./terraform init  # Initialize Terraform working directory using downloaded state
+
+      - name: Apply Terraform Destroy
+        run: |
+          echo "Destroying Terraform infrastructure..."
+          terraform -chdir=./terraform destroy -auto-approve  # Destroy the resources using the downloaded state file
+
+      - name: Cleanup Terraform Files
+        run: |
+          echo "Cleaning up Terraform files..."
+          rm -rf ./terraform  # Optionally clean up any temporary files after the destroy operation
