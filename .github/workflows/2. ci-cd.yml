@@ -1,4 +1,4 @@
-name: CI/CD Workflow
+name: 2. CI/CD Workflow with Terraform
 
 on:
   push:
@@ -189,28 +189,3 @@ jobs:
           
           echo "Successfully tested the Kubernetes service"
           
-  undeploy:
-    runs-on: ubuntu-latest
-    needs: app-deploy  # Make sure to wait for the app-deploy job to finish
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials for kubectl
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Update kubeconfig to access EKS cluster
-        run: |
-          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-
-      - name: Undeploy Kubernetes resources
-        run: |
-          kubectl delete deployment ${{ env.SPRING_BOOT_APP_NAME }}-deployment
-          kubectl delete svc ${{ env.SPRING_BOOT_APP_NAME }}-service
-          kubectl delete configmap ${{ env.SPRING_BOOT_APP_NAME }}-configmap || true
-          kubectl delete secret ${{ env.SPRING_BOOT_APP_NAME }}-secret || true
