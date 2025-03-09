@@ -1,0 +1,22 @@
+name: Upload Artifacts Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Create a file to upload
+        run: echo "Hello, world!" > hello.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: example-artifact
+          path: hello.txt

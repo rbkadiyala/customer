@@ -1,0 +1,22 @@
+name: Download Artifacts Workflow
+
+on:
+  workflow_run:
+    workflows: ["Upload Artifacts Workflow"]
+    types:
+      - completed
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: example-artifact
+
+      - name: Show the contents of the downloaded file
+        run: cat hello.txt

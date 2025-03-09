@@ -1,4 +1,4 @@
-name: 3. Manually triggered application undeploy workflow
+name: 3. Application undeploy workflow
 
 on:
   workflow_dispatch:  # Allows the workflow to be triggered manually from the GitHub UI
