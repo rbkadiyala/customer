@@ -2,9 +2,10 @@ name: Download Artifacts Workflow
 
 on:
   workflow_run:
-    workflows: ["Upload Artifacts Workflow"]
+    workflows: ["Upload Artifacts Workflow"]   # The name of the first workflow
     types:
-      - completed
+      - success   # This ensures it runs only after the first workflow succeeds
+
 
 jobs:
   download:
