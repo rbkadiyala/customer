@@ -7,9 +7,6 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
       - name: List files after artifact download
         run: ls -alh  # This will list all files in the current directory after downloading the artifact
   
