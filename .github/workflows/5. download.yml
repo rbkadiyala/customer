@@ -1,11 +1,6 @@
 name: Download Artifacts Workflow
 
-on:
-  workflow_run:
-    workflows: ["Upload Artifacts Workflow"]  # The name of the first workflow
-    types:
-      - success  # This ensures it runs only after the first workflow succeeds
-      
+on:    
   workflow_dispatch:  # Triggered manually from GitHub UI      
 
 jobs:
