@@ -1,5 +1,8 @@
 name: Download Artifacts Workflow
 
+on:
+  workflow_dispatch:  # Triggered manually from GitHub UI
+  
 jobs:
   download:
     runs-on: ubuntu-latest
