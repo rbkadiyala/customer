@@ -18,3 +18,6 @@ jobs:
         with:
           name: example-artifact
           path: hello.txt
+          
+      - name: List files before upload
+        run: ls -alh  # This will list all files in the current directory
