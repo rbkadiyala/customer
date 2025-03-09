@@ -5,6 +5,8 @@ on:
     workflows: ["Upload Artifacts Workflow"]  # The name of the first workflow
     types:
       - success  # This ensures it runs only after the first workflow succeeds
+      
+  workflow_dispatch:  # Triggered manually from GitHub UI      
 
 jobs:
   download:
