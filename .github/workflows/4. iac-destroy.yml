@@ -29,12 +29,6 @@ jobs:
       - name: Ensure Terraform Directory Exists
         run: mkdir -p ./terraform  # Ensure the 'terraform' directory exists
 
-      - name: Download Terraform State from Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-state  # Download the artifact containing the Terraform state
-          path: ./terraform      # Specify the path where the artifact will be downloaded
-
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:

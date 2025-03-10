@@ -47,8 +47,3 @@ jobs:
           echo "Applying Terraform plan..."
           terraform -chdir=./terraform apply -auto-approve plan.tfplan  # Apply the existing plan
 
-      - name: Upload Terraform State to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-state
-          path: ./terraform/terraform.tfstate  # Path to the Terraform state file
