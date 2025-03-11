@@ -143,6 +143,11 @@ jobs:
           echo "resources:" > k8s/kustomization.yaml  # Create kustomization file
           echo "- k8s-deployment.yaml" >> k8s/kustomization.yaml  # Add deployment file reference
 
+      - name: Print the Kustomization file
+        run: |
+          echo "Printing the Kustomization file after creation:"
+          cat k8s/kustomization.yaml  # Print the kustomization file to the console
+
       - name: Apply Kubernetes deployment using kubectl
         run: |
           kubectl kustomize k8s | kubectl apply -f - --force  # Apply the k8s configuration with force to ensure it's up-to-date
