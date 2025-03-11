@@ -1,4 +1,4 @@
- apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${SPRING_BOOT_APP_NAME}-deployment
@@ -19,6 +19,7 @@ spec:
           image: ${ECR_REPOSITORY_URL}:${IMAGE_TAG}  # Use dynamic values from the GitHub Actions pipeline
           ports:
             - containerPort: ${CONTAINER_PORT}
+
 ---
 apiVersion: v1
 kind: Service
