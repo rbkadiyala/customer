@@ -40,10 +40,10 @@ jobs:
       - name: Generate Terraform Plan
         run: |
           echo "Generating Terraform Plan..."
-          terraform -chdir=./terraform plan -out=plan.tfplan  # Generate the plan and save it
+          terraform -chdir=./terraform plan -out=${{ env.EKS_CLUSTER_NAME }}.tfplan  # Generate the plan and save it
 
       - name: Apply Terraform Plan
         run: |
           echo "Applying Terraform plan..."
-          terraform -chdir=./terraform apply -auto-approve plan.tfplan  # Apply the existing plan
+          terraform -chdir=./terraform apply -auto-approve ${{ env.EKS_CLUSTER_NAME }}.tfplan  # Apply the existing plan
 
